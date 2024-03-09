@@ -32,7 +32,7 @@ while running:
     elif keys[pygame.K_UP]:
         action = 3
     elif keys[pygame.K_SPACE]:
-        action = 5  # Assume shoot action is 5
+        action = 5  # Shoot
 
     # Update the environment
     state, reward, done, _= env.step(action)
