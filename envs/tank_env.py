@@ -104,28 +104,6 @@ class TankEnv(gym.Env):
         
     def step(self, action):
         reward = self.timestep
-        # Mettre à jour l'état du joueur
-        ## strat: en fonction de l'action
-        ## reward si l'action est "stay" ou "shoot", 0 sinon
-        bondaries = {
-            'max_x': self.max_x,
-            'max_y': self.max_y,
-        }
-        self.state['player'].update(action, self.state, self.occupied_positions, bondaries)
-        if action == 4:
-            reward += self.reward_nothing
-        elif action == 5:
-            reward += self.reward_used_projectile
-
-        # Mettre à jour l'état des ennemis
-        ## strat: de maniere aleatoire
-        for enemy in self.state['enemies']:
-            enemy.update_strategic(self.state, self.occupied_positions, bondaries, strategy=2)
-
-        # Mettre à jour l'état des projectiles
-        ## position
-        for projectile in list(self.state['projectiles']): # list() pour éviter les modifications en cours de parcours
-            projectile.update(self.state, bondaries)
 
         ## annulation des projectiles qui se touchent si necessaire
         projectiles = list(self.state['projectiles'])
@@ -158,15 +136,17 @@ class TankEnv(gym.Env):
                 self.occupied_positions.add((x, y))
                 placed = True
 
-        # Nettoyer les ennemis tombés
+        # Nettoyer les ennemis tombés, les projectiles utilisés
         ## reward_ennemy_killed pour chaque ennemi tombé
         for enemy in list(self.state['enemies']):
             boxes = [(enemy.x + i, enemy.y + j) for i in range(-2, 3) for j in range(-2, 3)]
-            player_projectiles_positions = [(projectile.x, projectile.y) for projectile in self.state['projectiles'] if projectile.label == 0]
-            if any(pos in boxes for pos in player_projectiles_positions):
-                self.state['enemies'].remove(enemy)
-                self.occupied_positions.remove((enemy.x, enemy.y))
-                reward += self.reward_enemy_killed
+            for projectile in list(self.state['projectiles']):
+                if (projectile.x, projectile.y) in boxes and projectile.label == 0:
+                    self.state['enemies'].remove(enemy)
+                    self.occupied_positions.remove((enemy.x, enemy.y))
+                    self.state['projectiles'].remove(projectile)
+                    reward += self.reward_enemy_killed
+                    break
 
         # Verifier si le joueur est mort
         ## le joueur est mort: done = True, reward = reward_player_dead
@@ -177,7 +157,33 @@ class TankEnv(gym.Env):
             self.done = True
             reward += self.reward_player_dead
 
-        # return new_state, reward, done, info= {}
+        ##################### update #####################
+            
+        # # Mettre à jour l'état du joueur
+        ## strat: en fonction de l'action
+        ## reward si l'action est "stay" ou "shoot", 0 sinon
+        bondaries = {
+            'max_x': self.max_x,
+            'max_y': self.max_y,
+        }
+        self.state['player'].update(action, self.state, self.occupied_positions, bondaries)
+        if action == 4:
+            reward += self.reward_nothing
+        elif action == 5:
+            reward += self.reward_used_projectile
+
+        # Mettre à jour l'état des ennemis
+        ## strat: de maniere aleatoire
+        for enemy in self.state['enemies']:
+            enemy.update_strategic(self.state, self.occupied_positions, bondaries, strategy=2)
+
+        # Mettre à jour l'état des projectiles
+        ## position
+        for projectile in list(self.state['projectiles']): # list() pour éviter les modifications en cours de parcours
+            projectile.update(self.state, bondaries)
+        
+        ##################### update done #####################
+            
         return self.state, reward, self.done, {}
 
     def render(self, mode='human'):
