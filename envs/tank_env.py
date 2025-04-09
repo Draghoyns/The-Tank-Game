@@ -6,15 +6,15 @@ from gym import spaces
 import matplotlib.pyplot as plt
 import numpy as np
 
-# Création de l'environnement
+# Creating environnement
 class TankEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, max_x = 20, max_y = 20, max_enemies_on_screen = 5, total_ennemies_to_kill = 20):
         super(TankEnv, self).__init__()
         
-        self.max_x = max_x # Largeur de la grille
-        self.max_y = max_y # Hauteur de la grille
+        self.max_x = max_x # Width of grid
+        self.max_y = max_y # Height of grid
         self.max_enemies_on_screen = max_enemies_on_screen
         self.max_projectiles = max_x * max_y
 
@@ -64,21 +64,21 @@ class TankEnv(gym.Env):
         self.occupied_positions = set()
         self.done = False
 
-        # placer le joueur
-        ## strat: de manière aléatoire
+        # place the player
+        ## strategy : random
         x = np.random.randint(0, self.max_x)
         y = np.random.randint(0, self.max_y)
 
         direction = np.zeros(4, dtype=int)
-        direction[np.random.randint(0, 4)] = 1 # une direction aléatoire
+        direction[np.random.randint(0, 4)] = 1 # random direction
 
         player = Tank(x, y, direction, label=0)
         self.state['player'] = player
 
         self.occupied_positions.add((x, y))
 
-        # placer les ennemis, attention aux collisions
-        ## strat: self.initial_ennemies ennemis de manière aléatoire
+        # place enemies, beware of collisions
+        ## strat: self.initial_ennemies random ennemies
         ennemies = set()
         for i in range(self.initial_ennemies):
             placed = False
@@ -105,7 +105,7 @@ class TankEnv(gym.Env):
     def step(self, action):
         reward = self.timestep
 
-        ## annulation des projectiles qui se touchent si necessaire
+        ## canceling projectiles that touch each other if necessary
         projectiles = list(self.state['projectiles'])
         for i in range(len(projectiles)):
             for j in range(i+1, len(projectiles)):
@@ -117,8 +117,8 @@ class TankEnv(gym.Env):
                     except:
                         pass
 
-        # Rajouter 1 ennemi si le nombre d'ennemis actifs est inférieur à max_enemies
-        ## strat: de manière aléatoire avec une probabilité de self.probability_new_enemy
+        # Add 1 enemy if the number of active enemies is less than max_enemies
+        ## strategy: randomly with a probability of self.probability_new_enemy
         if (len(self.state['enemies']) < self.max_enemies_on_screen and np.random.rand() < self.probability_new_enemy) or len(self.state['enemies']) == 0:
             placed = False
             while not placed:
@@ -136,8 +136,8 @@ class TankEnv(gym.Env):
                 self.occupied_positions.add((x, y))
                 placed = True
 
-        # Nettoyer les ennemis tombés, les projectiles utilisés
-        ## reward_ennemy_killed pour chaque ennemi tombé
+        # Clean up defeated enemies and used projectiles
+        ## reward_enemy_killed for each defeated enemy
         for enemy in list(self.state['enemies']):
             boxes = [(enemy.x + i, enemy.y + j) for i in range(-2, 3) for j in range(-2, 3)]
             for projectile in list(self.state['projectiles']):
@@ -148,9 +148,9 @@ class TankEnv(gym.Env):
                     reward += self.reward_enemy_killed
                     break
 
-        # Verifier si le joueur est mort
-        ## le joueur est mort: done = True, reward = reward_player_dead
-        ## le joueur n'est pas mort: done = False
+        # Check if the player is dead
+        ## if the player is dead: done = True, reward = reward_player_dead
+        ## if the player is not dead: done = False
         boxes = [(self.state['player'].x + i, self.state['player'].y + j) for i in range(-2, 3) for j in range(-2, 3)]
         ennemies_projectiles_positions = [(projectile.x, projectile.y) for projectile in self.state['projectiles'] if projectile.label == 1]
         if any(pos in boxes for pos in ennemies_projectiles_positions):
@@ -159,9 +159,9 @@ class TankEnv(gym.Env):
 
         ##################### update #####################
             
-        # # Mettre à jour l'état du joueur
-        ## strat: en fonction de l'action
-        ## reward si l'action est "stay" ou "shoot", 0 sinon
+        # Update the player's state
+        ## strategy: based on the action
+        ## reward if the action is "stay" or "shoot", 0 otherwise
         bondaries = {
             'max_x': self.max_x,
             'max_y': self.max_y,
@@ -172,14 +172,14 @@ class TankEnv(gym.Env):
         elif action == 5:
             reward += self.reward_used_projectile
 
-        # Mettre à jour l'état des ennemis
-        ## strat: de maniere aleatoire
+        # Update the state of enemies
+        ## strategy: random
         for enemy in self.state['enemies']:
             enemy.update_strategic(self.state, self.occupied_positions, bondaries, strategy=2)
 
-        # Mettre à jour l'état des projectiles
+        # Update the state of projectiles
         ## position
-        for projectile in list(self.state['projectiles']): # list() pour éviter les modifications en cours de parcours
+        for projectile in list(self.state['projectiles']): # list() to avoid modifications while iterating
             projectile.update(self.state, bondaries)
         
         ##################### update done #####################
@@ -187,11 +187,11 @@ class TankEnv(gym.Env):
         return self.state, reward, self.done, {}
 
     def render(self, mode='human'):
-        # Créer une matrice M de taille max_x * max_y + un padding de 1 de chaque côté
+        # Create a matrix M of size max_x * max_y with a padding of 1 on each side
         rows = self.max_y + 2
         cols = self.max_x + 2
         M = np.ones((rows, cols, 3), dtype=np.uint8) * 240 # white background
-        # remplir la matrice avec les éléments de l'environnement
+        # fill the matrix with the elements of the environment
         def fill_tank(tank, color):
             # print(f"#### filling tank {tank.coord_and_dir} with color {color} ####")
             x, y, dir, _ = tank.info()
@@ -215,14 +215,14 @@ class TankEnv(gym.Env):
                 M[y+1, x, :] = color
             if dir in [0, 3]:
                 M[y+1, x+1, :] = color
-        ## remplir avec le joueur
+        ## fill with player
         fill_tank(self.state['player'], [92, 184, 92])
                 
-        ## remplir avec les ennemis
+        ## fill with enemies
         for enemy in self.state['enemies']:
             fill_tank(enemy, [240, 173, 78])
 
-        ## remplir avec les projectiles
+        ## fill with projectiles
         for projectile in self.state['projectiles']:
             x, y, dir, label = projectile.info()
             if label == 0:

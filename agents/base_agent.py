@@ -1,5 +1,5 @@
 class BaseAgent:
-    """Classe de base pour les agents RL."""
+    """Base classfor RL agents"""
     def __init__(self, action_space, observation_space):
         self.action_space = action_space
         self.observation_space = observation_space
