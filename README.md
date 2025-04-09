@@ -20,4 +20,19 @@ to experiment with them on this particular game.
 
 This is an academic project.
 Nothing really relevant except the Python "implementation" of the game,
-that is not playable for now. (and will only be if I have some extra time where I'm REALLY bored)
+that is playable with arrow keys.
+
+## Playing
+
+Run `game_play.py`.
+
+A window will pop up, with a green tank and yellow tanks. You are the green player.
+
+You can move with arrow keys (up - down - left - right) and shoot with the space bar.
+
+If you die, the game resets.
+
+TODO :
+- show the current score
+- show the play time
+- stop if the player dies
