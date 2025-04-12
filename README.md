@@ -30,9 +30,10 @@ A window will pop up, with a green tank and yellow tanks. You are the green play
 
 You can move with arrow keys (up - down - left - right) and shoot with the space bar.
 
-If you die, the game resets.
+If you die, the game resets. You cannot end the game unless you quit.
 
 TODO :
 - show the current score
 - show the play time
 - stop if the player dies
+- make a fill function in game elements to be called when rendering 
