@@ -5,7 +5,7 @@ from envs import *
 
 # Initialize pygame and the environment
 pygame.init()
-env = TankEnv()
+env = TankEnv(obstacles='low')
 env.reset()
 
 # Set up the display

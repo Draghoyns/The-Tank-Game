@@ -2,7 +2,6 @@ from envs.game_elements import *
 
 import gym
 from gym import spaces
-
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -10,7 +9,9 @@ import numpy as np
 class TankEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, max_x = 20, max_y = 20, max_enemies_on_screen = 5, total_ennemies_to_kill = 20):
+    def __init__(self, max_x = 20, max_y = 20, max_enemies_on_screen = 5, total_ennemies_to_kill = 20, obstacles = ''):
+        """obstacles: string of obstacles, in ['', 'low', 'high']"""
+
         super(TankEnv, self).__init__()
         
         self.max_x = max_x # Width of grid
@@ -20,6 +21,7 @@ class TankEnv(gym.Env):
 
         self.total_ennemies_to_kill = total_ennemies_to_kill
         self.initial_ennemies = 2
+        self.obstacles = obstacles
 
         # assertions
         assert max_x > 0
@@ -36,14 +38,16 @@ class TankEnv(gym.Env):
         self.observation_space = spaces.Dict({
             'player': spaces.Box(low=np.array([0, 0, 0]), high=np.array([self.max_x, self.max_y, 4]), dtype=dtypes),  # x, y, direction
             'enemies': spaces.Box(low=np.zeros((self.max_enemies_on_screen, 3), dtype=dtypes), high=np.array([self.max_x, self.max_y, 4] * self.max_enemies_on_screen).reshape(self.max_enemies_on_screen, 3), dtype=dtypes),
-            'projectiles': spaces.Box(low=np.zeros((self.max_projectiles, 4), dtype=dtypes), high=np.array([self.max_x, self.max_y, 4, 1] * self.max_projectiles).reshape(self.max_projectiles, 4), dtype=dtypes)  # x, y, direction, from (0: player, 1: enemy)
+            'projectiles': spaces.Box(low=np.zeros((self.max_projectiles, 4), dtype=dtypes), high=np.array([self.max_x, self.max_y, 4, 1] * self.max_projectiles).reshape(self.max_projectiles, 4), dtype=dtypes),  # x, y, direction, from (0: player, 1: enemy)
+            'obstacles': spaces.Box(low=np.zeros((self.max_x, self.max_y), dtype=dtypes), high=np.ones((self.max_x, self.max_y), dtype=dtypes), dtype=dtypes)  # obstacles
         })
 
         # Define state
         self.state = {
             'player': set(),
             'enemies': set(), # (Tank(0, 0, np.array([0, 0, 1, 0])), Tank(0, 0, np.array([0, 0, 1, 0])), ...)
-            'projectiles': set() # (Projectile(0, 0, np.array([0, 0, 1, 0]), label=0), Projectile(0, 0, np.array([0, 0, 1, 0]), label=1), ...)
+            'projectiles': set(), # (Projectile(0, 0, np.array([0, 0, 1, 0]), label=0), Projectile(0, 0, np.array([0, 0, 1, 0]), label=1), ...)
+            'obstacles': set() 
         }
 
         # Set of all positions occupied by tanks
@@ -77,6 +81,37 @@ class TankEnv(gym.Env):
 
         self.occupied_positions.add((x, y))
 
+        # place obstacles
+        ## strategy: random
+
+        obstacles = set()
+        if self.obstacles == 'low':
+            nb_obstacles= self.max_x * self.max_y // 80
+        elif self.obstacles == 'high':
+            nb_obstacles = self.max_x * self.max_y // 20
+        else:
+            nb_obstacles = 0
+        if nb_obstacles > 1:
+                for i in range(nb_obstacles):
+                    placed = False
+                    while not placed:
+                        x = np.random.randint(0, self.max_x)
+                        y = np.random.randint(0, self.max_y)
+
+                        boxes = [(x + i, y + j) for i in range(-2, 3) for j in range(-2, 3)]
+
+                        if any(box in self.occupied_positions for box in boxes):
+                            continue
+
+                        direction = np.zeros(4, dtype=int)
+                        direction[np.random.randint(0, 4)] = 1
+
+                        obstacles.add((x, y))
+                        self.occupied_positions.add((x, y))
+                        placed = True
+
+        self.state['obstacles'] = obstacles
+
         # place enemies, beware of collisions
         ## strat: self.initial_ennemies random ennemies
         ennemies = set()
@@ -99,7 +134,15 @@ class TankEnv(gym.Env):
 
         self.state['enemies'] = ennemies
 
-        print("#### environnement reset successfully ####")
+        # if the player is stuck, we reset
+        # stuck = more than 3 obstacles around the player
+        boxes = [(self.state['player'].x + i, self.state['player'].y + j) for i in range(-2, 3) for j in range(-2, 3)]
+        obstacles_around_player = [box for box in boxes if box in obstacles]
+        if len(obstacles_around_player) > 3:
+            print("#### player is stuck, resetting ####")
+            self.reset()
+        else:
+            print("#### environnement reset successfully ####")
         
         
     def step(self, action):
@@ -138,20 +181,30 @@ class TankEnv(gym.Env):
 
         # Clean up defeated enemies and used projectiles
         ## reward_enemy_killed for each defeated enemy
+        obstacle_boxes = []
+        for obstacle in list(self.state['obstacles']):
+            boxes = [(obstacle[0] + i, obstacle[1] + j) for i in range(-1, 2) for j in range(-1, 2)]
+            obstacle_boxes += boxes
+
         for enemy in list(self.state['enemies']):
-            boxes = [(enemy.x + i, enemy.y + j) for i in range(-2, 3) for j in range(-2, 3)]
+            enemy_boxes = [(enemy.x + i, enemy.y + j) for i in range(-1, 2) for j in range(-1, 2)]
             for projectile in list(self.state['projectiles']):
-                if (projectile.x, projectile.y) in boxes and projectile.label == 0:
+
+                if (projectile.x, projectile.y) in obstacle_boxes:
+                    self.state['projectiles'].remove(projectile)
+
+                if (projectile.x, projectile.y) in enemy_boxes and projectile.label == 0:
                     self.state['enemies'].remove(enemy)
                     self.occupied_positions.remove((enemy.x, enemy.y))
                     self.state['projectiles'].remove(projectile)
                     reward += self.reward_enemy_killed
-                    break
+                    break 
+
 
         # Check if the player is dead
         ## if the player is dead: done = True, reward = reward_player_dead
         ## if the player is not dead: done = False
-        boxes = [(self.state['player'].x + i, self.state['player'].y + j) for i in range(-2, 3) for j in range(-2, 3)]
+        boxes = [(self.state['player'].x + i, self.state['player'].y + j) for i in range(-1, 2) for j in range(-1, 2)]
         ennemies_projectiles_positions = [(projectile.x, projectile.y) for projectile in self.state['projectiles'] if projectile.label == 1]
         if any(pos in boxes for pos in ennemies_projectiles_positions):
             self.done = True
@@ -162,11 +215,11 @@ class TankEnv(gym.Env):
         # Update the player's state
         ## strategy: based on the action
         ## reward if the action is "stay" or "shoot", 0 otherwise
-        bondaries = {
+        boundaries = {
             'max_x': self.max_x,
             'max_y': self.max_y,
         }
-        self.state['player'].update(action, self.state, self.occupied_positions, bondaries)
+        self.state['player'].update(action, self.state, self.occupied_positions, boundaries)
         if action == 4:
             reward += self.reward_nothing
         elif action == 5:
@@ -175,12 +228,12 @@ class TankEnv(gym.Env):
         # Update the state of enemies
         ## strategy: random
         for enemy in self.state['enemies']:
-            enemy.update_strategic(self.state, self.occupied_positions, bondaries, strategy=2)
+            enemy.update_strategic(self.state, self.occupied_positions, boundaries, strategy=2)
 
         # Update the state of projectiles
         ## position
         for projectile in list(self.state['projectiles']): # list() to avoid modifications while iterating
-            projectile.update(self.state, bondaries)
+            projectile.update(self.state, boundaries)
         
         ##################### update done #####################
             
@@ -191,6 +244,7 @@ class TankEnv(gym.Env):
         rows = self.max_y + 2
         cols = self.max_x + 2
         M = np.ones((rows, cols, 3), dtype=np.uint8) * 240 # white background
+
         # fill the matrix with the elements of the environment
         def fill_tank(tank, color):
             # print(f"#### filling tank {tank.coord_and_dir} with color {color} ####")
@@ -215,20 +269,39 @@ class TankEnv(gym.Env):
                 M[y+1, x, :] = color
             if dir in [0, 3]:
                 M[y+1, x+1, :] = color
+
+        ## colors
+        green = [92, 184, 92] # player
+        yellow = [240, 173, 78] # enemies
+        black = [0, 0, 0] # obstacles
+        turquoise = [64,224,208] # projectiles - player
+        red = [217, 100, 79] # projectiles - enemies
+
         ## fill with player
-        fill_tank(self.state['player'], [92, 184, 92])
+        fill_tank(self.state['player'], green)
                 
         ## fill with enemies
         for enemy in self.state['enemies']:
-            fill_tank(enemy, [240, 173, 78])
+            fill_tank(enemy, yellow)
+
+        ## fill with obstacles
+        # 3 x 3 square obstacle
+        for obstacle in self.state['obstacles']:
+            x, y = obstacle
+            x += 1
+            y += 1
+            for i in range(-1, 2):
+                for j in range(-1, 2):
+                    M[y+i, x+j, :] = black
+
 
         ## fill with projectiles
         for projectile in self.state['projectiles']:
             x, y, dir, label = projectile.info()
             if label == 0:
-                M[y+1, x+1, :] = [217, 100, 79]
+                M[y+1, x+1, :] = turquoise
             else:
-                M[y+1, x+1, :] = [217, 83, 79]
+                M[y+1, x+1, :] = red
 
         # return frame
         return M
