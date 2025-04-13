@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class Tank:
     def __init__(self, x, y, direction, label=1):
         # defined by the center (a tank = 3x3 in display)
@@ -9,23 +10,38 @@ class Tank:
         self.y = y
         self.direction = direction
         self.label = label
-    
+        self.score = 0
+
+    def bounding_box(self):
+        return [
+            (self.state["player"].x + i, self.state["player"].y + j)
+            for i in range(-1, 2)
+            for j in range(-1, 2)
+        ]
+    def big_bounding_box(self):
+        return [
+            (self.state["player"].x + i, self.state["player"].y + j)
+            for i in range(-2, 3)
+            for j in range(-2, 3)
+        ]
+
+
     def info(self):
         return (self.x, self.y, np.argmax(self.direction), self.label)
-    
+
     def copy(self):
         direction_copy = self.direction.copy()
         return Tank(self.x, self.y, direction_copy, self.label)
 
-    def update(self, action, state, occupied_positions, bondaries):
+    def update(self, action, state, occupied_positions, boundaries):
         # action: 0: up, 1: right, 2: down, 3: left, 4: stay, 5: shoot
         occupied_positions.remove((self.x, self.y))
         if not (action == 4 or action == 5):
-            #if it matches, move forward
+            # if it matches, move forward
             if self.direction[action] == 1:
-                x = self.x + self.direction[1] - self.direction[3] # right - left
-                y = self.y + self.direction[2] - self.direction[0] # down - up
-                if x < 0 or x >= bondaries['max_x'] or y < 0 or y >= bondaries['max_y']:
+                x = self.x + self.direction[1] - self.direction[3]  # right - left
+                y = self.y + self.direction[2] - self.direction[0]  # down - up
+                if x < 0 or x >= boundaries["max_x"] or y < 0 or y >= boundaries["max_y"]:
                     occupied_positions.add((self.x, self.y))
                     return
                 # check collision with other tanks
@@ -37,61 +53,64 @@ class Tank:
                 self.x = x
                 self.y = y
 
-            #if it doesn't, rotate
+            # if it doesn't, rotate
             else:
-                self.direction = [0,0,0,0]
+                self.direction = [0, 0, 0, 0]
                 self.direction[action] = 1
 
         occupied_positions.add((self.x, self.y))
         if action == 5:
             self.shoot(state)
-        
-    
-    def update_strategic(self, state, occupied_positions, bondaries, strategy=0):
+
+    def update_strategic(self, state, occupied_positions, boundaries, strategy=0):
         if strategy == 0:
             # random strategy
-            action = np.random.randint(0, 6) # TODO: change 5 to 6 after
-            self.update(action, state, occupied_positions, bondaries)
-        
+            action = np.random.randint(0, 6)  # TODO: change 5 to 6 after
+            self.update(action, state, occupied_positions, boundaries)
+
         if strategy == 1:
             # follow more its direction with a probability of prob
             prob = 0.7
             if np.random.rand() < prob:
                 action = np.argmax(self.direction)
-                self.update(action, state, occupied_positions, bondaries)
+                self.update(action, state, occupied_positions, boundaries)
             else:
-                return self.update_strategic(state, occupied_positions, bondaries, strategy=0)
+                return self.update_strategic(
+                    state, occupied_positions, boundaries, strategy=0
+                )
 
         if strategy == 2:
             # go to the player with a probability of prob
             prob = 0.1
             if np.random.rand() < prob:
                 # go to the player
-                if self.x < state['player'].x:
+                if self.x < state["player"].x:
                     action = 1
-                elif self.x > state['player'].x:
+                elif self.x > state["player"].x:
                     action = 3
-                elif self.y < state['player'].y:
+                elif self.y < state["player"].y:
                     action = 2
-                elif self.y > state['player'].y:
+                elif self.y > state["player"].y:
                     action = 0
                 else:
                     action = 4
-                self.update(action, state, occupied_positions, bondaries)
+                self.update(action, state, occupied_positions, boundaries)
             else:
-                return self.update_strategic(state, occupied_positions, bondaries, strategy=1)
-            
+                return self.update_strategic(
+                    state, occupied_positions, boundaries, strategy=1
+                )
 
     def shoot(self, state):
         # create a new projectile
         # to be called after the updating of the projectiles
         p = Projectile(
-            self.x + 2*(self.direction[1] - self.direction[3]),
-            self.y + 2*(self.direction[2] - self.direction[0]),
+            self.x + 2 * (self.direction[1] - self.direction[3]),
+            self.y + 2 * (self.direction[2] - self.direction[0]),
             self.direction,
-            label=self.label
+            label=self.label,
         )
-        state['projectiles'].add(p)
+        state["projectiles"].add(p)
+
 
 class Projectile:
     def __init__(self, x, y, direction, label):
@@ -103,11 +122,16 @@ class Projectile:
     def info(self):
         return (self.x, self.y, np.argmax(self.direction), self.label)
 
-    def update(self, state, bondaries):
+    def update(self, state, boundaries):
         # move
-        self.x += self.direction[1] - self.direction[3] # right - left
-        self.y += self.direction[2] - self.direction[0] # down - up
-        
+        self.x += self.direction[1] - self.direction[3]  # right - left
+        self.y += self.direction[2] - self.direction[0]  # down - up
+
         # check if it's out of bondaries
-        if self.x <= -1 or self.x > bondaries['max_x'] or self.y <= -1 or self.y > bondaries['max_y']: # add + or - 1 because of padding
-            state['projectiles'].remove(self)
+        if (
+            self.x <= -1
+            or self.x > boundaries["max_x"]
+            or self.y <= -1
+            or self.y > boundaries["max_y"]
+        ):  # add + or - 1 because of padding
+            state["projectiles"].remove(self)
