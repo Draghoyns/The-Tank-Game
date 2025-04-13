@@ -4,7 +4,7 @@ The Tank Game is a simple game that comes from the same series as Tetris,
 played on the same device.
 The user plays a tank,
 which has to shoot other enemy tanks while avoiding their projectiles.
-The goal is simply to have the highest score without gzeztting killed.
+The goal is to kill a certain amount of enemies while achieving the highest possible score.
 
 The Tank Game itself is already coded in Java (**TODO : add link**),
 but as we want to apply methods to solve / optimize the plays,
