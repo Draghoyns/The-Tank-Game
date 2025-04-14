@@ -14,13 +14,13 @@ class Tank:
 
     def bounding_box(self):
         return [
-            (self.state["player"].x + i, self.state["player"].y + j)
+            (self.x + i, self.y + j)
             for i in range(-1, 2)
             for j in range(-1, 2)
         ]
     def big_bounding_box(self):
         return [
-            (self.state["player"].x + i, self.state["player"].y + j)
+            (self.x + i, self.y + j)
             for i in range(-2, 3)
             for j in range(-2, 3)
         ]

@@ -392,5 +392,5 @@ class Board(object):
     def render(self):
 
         # careful : not render enemies if playing 2p
-        # not render enemy is playing 1p
+        # not render enemy if playing 1p
         pass
