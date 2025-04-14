@@ -1,5 +1,14 @@
 from envs.game_elements import *
-from utils.coloring import fill_tank, fill_obstacle, fill_projectile
+from utils.coloring import (
+    fill_tank,
+    fill_obstacle,
+    fill_projectile,
+    green,
+    yellow,
+    black,
+    turquoise,
+    red,
+)
 
 import gym
 from gym import spaces
@@ -88,33 +97,38 @@ class TankEnv(gym.Env):
 
         self.probability_new_enemy = 0.01
 
-        self.reward_enemy_killed = 1
-        self.reward_player_dead = -10
+        self.reward_enemy_killed = 10
+        self.reward_player_dead = -20
         self.reward_used_projectile = -0.1
-        self.reward_nothing = -0.1
-        self.timestep = -0.01
+        self.reward_nothing = -0.01
+        self.timestep = -0.001
 
         self.done = False
         self.info = {}
 
-    def reset(self):
+    def reset(self, initial_run=True):
         self.occupied_positions = set()
         self.done = False
 
-        # place the player
-        ## strategy : random
-        x = np.random.randint(0, self.max_x)
-        y = np.random.randint(0, self.max_y)
+        if initial_run:
+            # place the player
+            ## strategy : random
+            x = np.random.randint(0, self.max_x)
+            y = np.random.randint(0, self.max_y)
 
-        direction = np.zeros(4, dtype=int)
-        direction[np.random.randint(0, 4)] = 1  # random direction
+            direction = np.zeros(4, dtype=int)
+            direction[np.random.randint(0, 4)] = 1  # random direction
 
-        player = Tank(x, y, direction, label=0)
-        self.state["player"] = player
+            player = Tank(x, y, direction, label=0)
+            self.state["player"] = player
 
-        self.occupied_positions.add((x, y))
+            self.occupied_positions.add((x, y))
+        else:
+            self.occupied_positions.add(
+                (self.state["player"].x, self.state["player"].y)
+            )
 
-        # place obstacles
+            # place obstacles
         ## strategy: random
 
         obstacles = set()
@@ -248,20 +262,26 @@ class TankEnv(gym.Env):
                     self.occupied_positions.remove((enemy.x, enemy.y))
                     self.state["projectiles"].remove(projectile)
                     reward += self.reward_enemy_killed
+                    self.state["player"].kills += 1
                     break
 
         # Check if the player is dead
-        ## if the player is dead: done = True, reward = reward_player_dead
-        ## if the player is not dead: done = False
+        # the game doesn't end when the player dies
         boxes = self.state["player"].bounding_box()
-        ennemies_projectiles_positions = [
-            (projectile.x, projectile.y)
-            for projectile in self.state["projectiles"]
-            if projectile.label == 1
-        ]
-        if any(pos in boxes for pos in ennemies_projectiles_positions):
+        ennemies_projectiles_positions = []
+        for projectile in list(self.state["projectiles"]):
+            if projectile.label == 1:
+                ennemies_projectiles_positions.append(projectile)
+
+        for projectile in ennemies_projectiles_positions:
+            if (projectile.x, projectile.y) in boxes:
+                self.state["projectiles"].remove(projectile)
+                reward += self.reward_player_dead
+                self.state["player"].deaths += 1
+                self.reset(initial_run=False)
+
+        if self.state["player"].kills >= self.total_ennemies_to_kill:
             self.done = True
-            reward += self.reward_player_dead
 
         ##################### update #####################
 
@@ -296,6 +316,8 @@ class TankEnv(gym.Env):
 
         ##################### update done #####################
 
+        self.state["player"].score += reward
+
         return self.state, reward, self.done, {}
 
     # __________RENDERING__________#
@@ -307,12 +329,6 @@ class TankEnv(gym.Env):
         M = np.ones((rows, cols, 3), dtype=np.uint8) * 240  # white background
 
         # fill the matrix with the elements of the environment
-        ## colors
-        green = [92, 184, 92]  # player
-        yellow = [240, 173, 78]  # enemies
-        black = [0, 0, 0]  # obstacles
-        turquoise = [64, 224, 208]  # projectiles - player
-        red = [217, 100, 79]  # projectiles - enemies
 
         ## fill with player
         M = fill_tank(self.state["player"], green, M)

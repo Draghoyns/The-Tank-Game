@@ -1,3 +1,11 @@
+green = [92, 184, 92]  # player
+yellow = [240, 173, 78]  # enemies
+black = [0, 0, 0]  # obstacles
+turquoise = [64, 224, 208]  # projectiles - player
+red = [217, 100, 79]  # projectiles - enemies
+
+
+
 def fill_tank(tank, color, M):
     x, y, dir, _ = tank.info()
     x += 1  # because of the padding

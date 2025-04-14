@@ -11,6 +11,8 @@ class Tank:
         self.direction = direction
         self.label = label
         self.score = 0
+        self.kills = 0
+        self.deaths = 0
 
     def bounding_box(self):
         return [
