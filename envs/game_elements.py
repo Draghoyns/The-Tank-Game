@@ -37,45 +37,48 @@ class Tank:
 
     def update(self, action, state, occupied_positions, boundaries):
         # action: 0: up, 1: right, 2: down, 3: left, 4: stay, 5: shoot
-        occupied_positions.remove((self.x, self.y))
+
         if not (action == 4 or action == 5):
             # if it matches, move forward
             if self.direction[action] == 1:
+                occupied_positions.remove((self.x, self.y))
                 x = self.x + self.direction[1] - self.direction[3]  # right - left
                 y = self.y + self.direction[2] - self.direction[0]  # down - up
                 if x < 0 or x >= boundaries["max_x"] or y < 0 or y >= boundaries["max_y"]:
                     occupied_positions.add((self.x, self.y))
-                    return
+                    return occupied_positions
                 # check collision with other tanks
                 # check if the 9 squares are arround the tank are occupied
                 boxes = [(x + i, y + j) for i in range(-2, 3) for j in range(-2, 3)]
                 if any(box in occupied_positions for box in boxes):
                     occupied_positions.add((self.x, self.y))
-                    return
+                    return occupied_positions
                 self.x = x
                 self.y = y
+                occupied_positions.add((self.x, self.y))
 
             # if it doesn't, rotate
             else:
                 self.direction = [0, 0, 0, 0]
                 self.direction[action] = 1
 
-        occupied_positions.add((self.x, self.y))
         if action == 5:
             self.shoot(state)
+
+        return occupied_positions
 
     def update_strategic(self, state, occupied_positions, boundaries, strategy=0):
         if strategy == 0:
             # random strategy
             action = np.random.randint(0, 6)  # TODO: change 5 to 6 after
-            self.update(action, state, occupied_positions, boundaries)
+            occupied_positions = self.update(action, state, occupied_positions, boundaries)
 
         if strategy == 1:
             # follow more its direction with a probability of prob
             prob = 0.7
             if np.random.rand() < prob:
                 action = np.argmax(self.direction)
-                self.update(action, state, occupied_positions, boundaries)
+                occupied_positions = self.update(action, state, occupied_positions, boundaries)
             else:
                 return self.update_strategic(
                     state, occupied_positions, boundaries, strategy=0
@@ -96,11 +99,13 @@ class Tank:
                     action = 0
                 else:
                     action = 4
-                self.update(action, state, occupied_positions, boundaries)
+                occupied_positions = self.update(action, state, occupied_positions, boundaries)
             else:
                 return self.update_strategic(
                     state, occupied_positions, boundaries, strategy=1
                 )
+        
+        return occupied_positions
 
     def shoot(self, state):
         # create a new projectile

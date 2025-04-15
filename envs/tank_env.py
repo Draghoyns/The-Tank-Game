@@ -27,6 +27,7 @@ class TankEnv(gym.Env):
         max_enemies_on_screen=5,
         total_ennemies_to_kill=20,
         obstacles="",
+        mode = "1p"
     ):
         """obstacles: string of obstacles, in ['', 'low', 'high']"""
 
@@ -40,6 +41,7 @@ class TankEnv(gym.Env):
         self.total_ennemies_to_kill = total_ennemies_to_kill
         self.initial_ennemies = 2
         self.obstacles = obstacles
+        self.mode = mode
 
         # assertions
         assert max_x > 0
@@ -83,6 +85,7 @@ class TankEnv(gym.Env):
                 ),  # obstacles
             }
         )
+        self.action_space = [i for i in range(6)]
 
         # Define state
         self.state = {
@@ -267,6 +270,7 @@ class TankEnv(gym.Env):
 
         # Check if the player is dead
         # the game doesn't end when the player dies
+        # the game ends when the player dies lol
         boxes = self.state["player"].bounding_box()
         ennemies_projectiles_positions = []
         for projectile in list(self.state["projectiles"]):
@@ -278,7 +282,26 @@ class TankEnv(gym.Env):
                 self.state["projectiles"].remove(projectile)
                 reward += self.reward_player_dead
                 self.state["player"].deaths += 1
-                self.reset(initial_run=False)
+                self.done
+                #self.reset(initial_run=False)
+
+        # for 2p game, check if enemy is dead
+        if self.mode == "2p":
+            boxes = self.state["enemy"].bounding_box()
+            player_projectiles_positions = []
+            for projectile in list(self.state["projectiles"]):
+                if projectile.label == 0:
+                    player_projectiles_positions.append(projectile)
+
+            for projectile in player_projectiles_positions:
+                if (projectile.x, projectile.y) in boxes:
+                    self.state["projectiles"].remove(projectile)
+                    self.state["enemy"].deaths += 1
+                    self.done
+                    #self.reset(initial_run=False)
+
+
+
 
         if self.state["player"].kills >= self.total_ennemies_to_kill:
             self.done = True
