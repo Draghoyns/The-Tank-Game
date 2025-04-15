@@ -1,14 +1,15 @@
-import numpy as np
+import numpy as np  # type: ignore
 import math
-import gym
-import pygame
-import matplotlib.pyplot as plt
+import gym  # type: ignore
+import pygame  # type: ignore
+import matplotlib.pyplot as plt  # type: ignore
+from gym import spaces  # type: ignore
 
 from envs.game_elements import Tank
 from utils.coloring import green, yellow, black, turquoise, red
 from utils.coloring import fill_tank, fill_obstacle, fill_projectile
 from envs.tank_env import TankEnv
-from game_play import main
+from game_play import main as game_main
 
 
 class Move(object):
@@ -87,7 +88,7 @@ class Board(gym.Env):
         self.max_y = max_y  # Height of grid
         self.max_enemies_on_screen = max_enemies_on_screen
         self.max_projectiles = max_x * max_y
-        self.action_space = [i for i in range(6)]
+        self.action_space = spaces.Discrete(6)
 
         # game settings
         self.total_ennemies_to_kill = total_ennemies_to_kill
@@ -102,7 +103,7 @@ class Board(gym.Env):
         self.reward_enemy_killed = 10
         self.reward_player_dead = -20
         self.reward_used_projectile = -0.1
-        self.reward_nothing = -0.01
+        self.reward_nothing = -0.02
         self.timestep = -0.001
 
         # assertions
@@ -115,18 +116,20 @@ class Board(gym.Env):
         # initialization
 
         self.state = {
-            "player": set(),
+            "player": Tank(0, 0, np.array([0, 0, 1, 0])),  # initializing
             "enemies": set(),  # (Tank(0, 0, np.array([0, 0, 1, 0])), Tank(0, 0, np.array([0, 0, 1, 0])), ...)
             "projectiles": set(),  # (Projectile(0, 0, np.array([0, 0, 1, 0]), label=0), Projectile(0, 0, np.array([0, 0, 1, 0]), label=1), ...)
             "obstacles": set(),
-            "enemy": set(),
+            "enemy": Tank(
+                0, 0, np.array([0, 0, 1, 0])
+            ),  # incompatble with player but will be overridden
         }
         self.occupied_positions = set()
 
         self.done = False
         self.info = {}
 
-    def reset(self, initial_run=True):
+    def reset(self, initial_run=True, seed=None, options=None):
         self.occupied_positions = set()
         self.done = False
 
@@ -185,7 +188,7 @@ class Board(gym.Env):
 
         if self.mode == "2p":
             self.initial_ennemies = 1
-            self.max_enemies_on_screen = 0
+            self.max_enemies_on_screen = 1  # fight for the same enemy
             self.total_ennemies_to_kill = 1
 
         ## strat: self.initial_ennemies random ennemies
@@ -209,7 +212,27 @@ class Board(gym.Env):
                 placed = True
 
         self.state["enemies"] = enemies
-        self.state["enemy"] = enemies.pop()
+
+        if self.mode == "2p":
+            enemy = self.state["enemy"]
+
+            placed = False
+            while not placed:
+                x = np.random.randint(0, self.max_x)
+                y = np.random.randint(0, self.max_y)
+
+                direction = np.zeros(4, dtype=int)
+                direction[np.random.randint(0, 4)] = 1
+
+                enemy = Tank(x, y, direction, label=2)
+                boxes = enemy.big_bounding_box()
+                if any(box in self.occupied_positions for box in boxes):
+                    continue
+
+                self.occupied_positions.add((x, y))
+                placed = True
+
+            self.state["enemy"] = enemy
 
         # __________COHERENCE__________#
         # if the player is stuck, we reset
@@ -240,12 +263,12 @@ class Board(gym.Env):
 
         return moves
 
-    def score(self) -> float:
+    def score(self) -> dict[str, float]:
         # current score of the player
         if self.mode == "1p":
-            return self.state[
-                "player"
-            ].score  # to be sure but normally self.turn doesn't change in 1p mode
+            return {
+                "p1": self.state["player"].score
+            }  # to be sure but normally self.turn doesn't change in 1p mode
         else:
             return {"p1": self.state["player"].score, "p2": self.state["enemy"].score}
 
@@ -256,24 +279,27 @@ class Board(gym.Env):
 
         return self.done
 
-    def step(self, move):
-        return self.play(move)
+    def step(self, action):
+        return self.play(action)
 
     def play(self, move):
 
         # play the move on the board
         if type(move) == int:
-
             action = move
         else:
             action = move.action
-        player = self.state[self.turn]  # Tank object
-        eni = self.state["enemy"] if self.turn == "player" else self.state["player"]
 
-        reward = self.timestep
+        reward = self.timestep  # to avoid inaction
+
+        player = self.turn
+        eni = ["enemy" if self.turn == "player" else "player"][0]
+
+        # debugging
+        kill_player = self.state[player].kills
 
         ## canceling projectiles that touch each other if necessary
-        # in theory it works, in practive there is some bug
+        # in theory it works, in practice there is some bug
         projectiles = list(self.state["projectiles"])
         for i in range(len(projectiles)):
             for j in range(i + 1, len(projectiles)):
@@ -295,7 +321,7 @@ class Board(gym.Env):
         if (
             len(self.state["enemies"]) < self.max_enemies_on_screen
             and np.random.rand() < self.probability_new_enemy
-        ) or len(self.state["enemies"]) == 0 and self.mode == "1p":
+        ) or len(self.state["enemies"]) == 0:
             placed = False
             while not placed:
                 eni_x = np.random.randint(0, self.max_x)
@@ -315,7 +341,6 @@ class Board(gym.Env):
                 placed = True
 
         # Clean up defeated enemies and used projectiles
-        ## reward_enemy_killed for each defeated enemy
         obstacle_boxes = []
         for obstacle in list(self.state["obstacles"]):
             boxes = [
@@ -331,51 +356,81 @@ class Board(gym.Env):
                 self.state["projectiles"].remove(projectile)
 
         # remove killed enemies
-        if self.mode == "1p":
-            for enemy in list(self.state["enemies"]):
-                enemy_boxes = enemy.bounding_box()
-                for projectile in list(self.state["projectiles"]):
-
-                    if (
-                        projectile.x,
-                        projectile.y,
-                    ) in enemy_boxes and projectile.label == 0:
-                        self.state["enemies"].remove(enemy)
-                        self.occupied_positions.remove((enemy.x, enemy.y))
-                        self.state["projectiles"].remove(projectile)
-                        reward += self.reward_enemy_killed
-                        break
-
-        else:
-            enemy_boxes = eni.bounding_box()
+        ## reward_enemy_killed for each defeated enemy
+        for enemy in list(self.state["enemies"]):
+            enemy_boxes = enemy.bounding_box()
             for projectile in list(self.state["projectiles"]):
+
                 if (
                     projectile.x,
                     projectile.y,
-                ) in enemy_boxes and projectile.label == player.label:
+                ) in enemy_boxes and projectile.label == self.state[player].label:
+                    self.state["enemies"].remove(enemy)
+                    self.occupied_positions.remove((enemy.x, enemy.y))
                     self.state["projectiles"].remove(projectile)
-                    reward += self.reward_enemy_killed
+                    self.state[player].kills += 1
+                    self.state[player].score += self.reward_enemy_killed
+
+                    # print("#### player killed an enemy ####")
                     break
+
+                if self.mode == "2p":
+                    if (
+                        projectile.x,
+                        projectile.y,
+                    ) in enemy_boxes and projectile.label == self.state[eni].label:
+                        self.state["projectiles"].remove(projectile)
+                        self.state["enemies"].remove(enemy)
+                        self.occupied_positions.remove((enemy.x, enemy.y))
+                        self.state[eni].kills += 1
+                        self.state[eni].score += self.reward_enemy_killed
+
+                        # print("#### other player killed an enemy ####")
+                        break
 
         # Check if the player is dead
         ## if the player is dead: done = True, reward = reward_player_dead
         ## if the player is not dead: done = False
-        boxes = player.bounding_box()
+        boxes = self.state[player].bounding_box()
+        boxes_eni = self.state[eni].bounding_box()
         ennemies_projectiles_positions = []
+        player_projectiles_positions = []
+        eni_projectiles_positions = []
 
         for projectile in list(self.state["projectiles"]):
-            if projectile.label == 1:
+            if projectile.label == 1:  # enemies projectile
                 ennemies_projectiles_positions.append(projectile)
+            if projectile.label == self.state[player].label:
+                player_projectiles_positions.append(projectile)  # player projectile
+            if projectile.label == self.state[eni].label:
+                eni_projectiles_positions.append(projectile)
 
-        for projectile in ennemies_projectiles_positions:
+        # check if the player is dead
+        for projectile in ennemies_projectiles_positions + eni_projectiles_positions:
             if (projectile.x, projectile.y) in boxes:
                 self.state["projectiles"].remove(projectile)
-                reward += self.reward_player_dead
-                self.state["player"].deaths += 1
+                self.state[player].score += self.reward_player_dead
+                self.state[player].deaths += 1
+
+                if projectile.label == self.state[eni].label:
+                    self.state[eni].score += self.reward_enemy_killed
+                    self.state[eni].kills += 1
+                # print("#### player is dead ####")
                 # self.reset(initial_run=False)
                 self.done = True
+        # check if the enemy is dead
+        for projectile in player_projectiles_positions + eni_projectiles_positions:
+            if (projectile.x, projectile.y) in boxes_eni:
+                self.state["projectiles"].remove(projectile)
+                self.state[eni].deaths += 1
+                self.state[eni].score += self.reward_player_dead
+                if projectile.label == self.state[player].label:
+                    self.state[player].kills += 1
+                    self.state[player].score += self.reward_enemy_killed
+                # print("#### other player is dead ####")
+                self.done = True
 
-        if self.state["player"].kills >= self.total_ennemies_to_kill:
+        if self.state[player].kills >= self.total_ennemies_to_kill:
             self.done = True
 
         ##################### update #####################
@@ -387,7 +442,7 @@ class Board(gym.Env):
             "max_x": self.max_x,
             "max_y": self.max_y,
         }
-        self.occupied_positions = player.update(
+        self.occupied_positions = self.state[player].update(
             action, self.state, self.occupied_positions, boundaries
         )
         if action == 4:
@@ -409,7 +464,7 @@ class Board(gym.Env):
         ):  # list() to avoid modifications while iterating
             projectile.update(self.state, boundaries)
 
-        player.score += reward
+        self.state[player].score += reward
 
         if self.mode == "2p":
             # switch the turn
@@ -419,12 +474,12 @@ class Board(gym.Env):
 
         return self.state, self.score(), self.done, {}
 
-    def playout(self):
+    def playout(self) -> dict[str, float]:
         # loop until the game is over
         while not self.terminal():
             moves = self.legalMoves()
             n = np.random.randint(0, len(moves) - 1)
-            _ = self.play(moves[n])  # random strategy
+            self.play(moves[n])  # random strategy
         return self.score()
 
     def board_matrix(self):
@@ -441,9 +496,8 @@ class Board(gym.Env):
         ## fill with enemies
         if self.mode == "2p":
             M = fill_tank(self.state["enemy"], red, M)
-        else:
-            for enemy in self.state["enemies"]:
-                M = fill_tank(enemy, yellow, M)
+        for enemy in self.state["enemies"]:
+            M = fill_tank(enemy, yellow, M)
 
         ## fill with obstacles
         # 3 x 3 square obstacle
@@ -461,7 +515,7 @@ class Board(gym.Env):
         env = TankEnv()
         env.reset()
 
-        main(self)
+        game_main(self)
         pygame.quit()
 
     def print(self):
@@ -478,17 +532,22 @@ class Node:
         self.children = []
         self.visits = 0
         self.value = 0.0
-        self.untried_actions = list(board.action_space)  # assumes Discrete action space
+        self.untried_actions = list(
+            range(board.action_space.n)
+        )  # assumes Discrete action space
         self.action = action
 
-    def ucb_score(self, exploration_constant=1.41):
+    def ucb_score(self, exploration_constant=1.41) -> float:
         if self.visits == 0:
             return float("inf")
-        return (self.value / self.visits) + exploration_constant * math.sqrt(
-            math.log(self.parent.visits) / self.visits
-        )
+        if self.parent is not None:
+            return (self.value / self.visits) + exploration_constant * math.sqrt(
+                math.log(self.parent.visits) / self.visits
+            )
+        else:
+            return 0.0
 
-    def is_fully_expanded(self):
+    def is_fully_expanded(self) -> bool:
         return len(self.untried_actions) == 0
 
     def best_child(self, exploration_constant=1.41):

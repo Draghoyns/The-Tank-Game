@@ -14,15 +14,17 @@ Python was more suitable for us so we re-implemented the game (which was not the
 
 The project is far from being done at this stage.
 
-The game exists, and that's it.
+The game exists, and is playable.
+
+This is an academic project.
+Nothing really relevant except the Python "implementation" of the game.
+
 We need to implement all kinds of methods, RL and Monte Carlo Search,
 to experiment with them on this particular game.
 
-This is an academic project.
-Nothing really relevant except the Python "implementation" of the game,
-that is playable with arrow keys.
-
 ## Playing
+
+Install the requirements.
 
 Run `game_play.py`.
 
@@ -33,7 +35,7 @@ You can move with arrow keys (up - down - left - right) and shoot with the space
 If you die, the game resets. You cannot end the game unless you quit.
 
 TODO :
-- show the current score
 - show the play time
 - stop if the player dies
 - make a fill function in game elements to be called when rendering 
+- refactor parts of the code that is redundant

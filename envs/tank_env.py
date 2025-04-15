@@ -85,11 +85,11 @@ class TankEnv(gym.Env):
                 ),  # obstacles
             }
         )
-        self.action_space = [i for i in range(6)]
+        self.action_space = spaces.Discrete(6)
 
         # Define state
         self.state = {
-            "player": set(),
+            "player": Tank(0, 0, np.array([0, 0, 1, 0]), label=0),  # Tank(0, 0, np.array([0, 0, 1, 0]))
             "enemies": set(),  # (Tank(0, 0, np.array([0, 0, 1, 0])), Tank(0, 0, np.array([0, 0, 1, 0])), ...)
             "projectiles": set(),  # (Projectile(0, 0, np.array([0, 0, 1, 0]), label=0), Projectile(0, 0, np.array([0, 0, 1, 0]), label=1), ...)
             "obstacles": set(),

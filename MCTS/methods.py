@@ -124,7 +124,7 @@ class UCT:
         for _ in range(self.max_rollout_steps):
             if getattr(env, "done", False):  # if env.done exists
                 break
-            action = random.choice(env.action_space)
+            action = random.choice(range(env.action_space.n))
             _, reward, done, _ = env.step(action)
             if self.board.mode == "2p":
                 reward = reward[self.player]
