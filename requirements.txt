@@ -1,0 +1,5 @@
+gymnasium
+matplotlib==3.10.7
+numpy
+pillow
+pygame

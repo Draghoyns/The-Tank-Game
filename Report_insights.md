@@ -29,4 +29,3 @@
 - study the reward function : is penalizing inaction necessary ?
 - use visual representation more wisely in the code
 - compare behaviors when constraints : red zone on the map, different levels, additional variables to influence decision-making => adaptability of the agent
-- change code comments to english (careful with french !) #TODO

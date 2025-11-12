@@ -39,18 +39,18 @@ def manhattan_distance(x1, y1, x2, y2):
 
 def calculer_vecteur_directeur_normalise(x1, y1, x2, y2):
     """
-    Calcule et normalise le vecteur directeur entre les points (x1, y1) et (x2, y2).
+    Calculates and normalizes the direction vector between points (x1, y1) and (x2, y2).
     """
-    # Calcul du vecteur directeur
+    # Calculate the direction vector
     dx = x2 - x1
     dy = y2 - y1
     
-    # Calcul de la norme du vecteur
+    # Calculate the magnitude of the vector
     norme = math.sqrt(dx**2 + dy**2)
     
-    # Normalisation du vecteur
+    # Normalization
     if norme == 0:
-        return  (0, 0)  # Gestion du cas où les deux points sont les mêmes
+        return (0, 0)  # Handle the case where the two points are the same
     else:
         vecteur_directeur = (dx, dy)
         vecteur_directeur_normalise = (dx / norme, dy / norme)

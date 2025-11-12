@@ -2,51 +2,76 @@ import pygame
 import numpy as np
 
 from envs import *
+from utils.coloring import green, red
 
-# Initialize pygame and the environment
-pygame.init()
-env = TankEnv()
-env.reset()
 
-# Set up the display
-screen_size = (env.max_x * 20, env.max_y * 20)  # Scale up the game screen
-screen = pygame.display.set_mode(screen_size)
-clock = pygame.time.Clock()
+def main(env):
 
-running = True
-while running:
-    # Check for events
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
+    # Set up the display
+    screen_size = (env.max_x * 20, env.max_y * 20)  # Scale up the game screen
+    screen = pygame.display.set_mode(screen_size)
+    clock = pygame.time.Clock()
+    font = pygame.font.Font(None, 36)
 
-    keys = pygame.key.get_pressed()
-    action = 4  # Default action (stay)
+    running = True
+    while running:
+        # Check for events
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
 
-    if keys[pygame.K_LEFT]:
-        action = 0
-    elif keys[pygame.K_DOWN]:
-        action = 1
-    elif keys[pygame.K_RIGHT]:
-        action = 2
-    elif keys[pygame.K_UP]:
-        action = 3
-    elif keys[pygame.K_SPACE]:
-        action = 5  # Shoot
+        keys = pygame.key.get_pressed()
+        action = 4  # Default action (stay)
 
-    # Update the environment
-    state, reward, done, _= env.step(action)
-    if done:
-        env.reset()
+        if keys[pygame.K_LEFT]:
+            action = 0
+        elif keys[pygame.K_DOWN]:
+            action = 1
+        elif keys[pygame.K_RIGHT]:
+            action = 2
+        elif keys[pygame.K_UP]:
+            action = 3
+        elif keys[pygame.K_SPACE]:
+            action = 5  # Shoot
 
-    # Render the game state
-    frame = env.render()
-    frame = np.repeat(np.repeat(frame, 18, axis=0), 18, axis=1)  # Scale up the frame for visibility
-    surface = pygame.surfarray.make_surface(frame)
-    screen.blit(surface, (0, 0))
-    pygame.display.flip()
+        # Update the environment
+        state, reward, done, _ = env.step(action)
+        if done:
+            env.reset()
 
-    # Cap the frame rate
-    clock.tick(9)
+        # Render the game state
+        frame = env.render()
+        frame = np.repeat(
+            np.repeat(frame, 18, axis=0), 18, axis=1
+        )  # Scale up the frame for visibility
+        surface = pygame.surfarray.make_surface(frame)
+        screen.blit(surface, (0, 0))
 
-pygame.quit()
+        # display score
+        value = round(state["player"].score, 0)
+        score = f"Score: {value}"
+        if value >= 0:
+            score_surface = font.render(score, True, green)
+        else:
+            score_surface = font.render(score, True, red)
+        score_width = score_surface.get_width()  # Get the width of the rendered text
+        screen.blit(
+            score_surface, (screen.get_width() - score_width - 10, 10)
+        )  # Position at top-right with 10px padding
+
+        pygame.display.flip()
+
+        # Cap the frame rate
+        clock.tick(9)
+
+
+if __name__ == "__main__":
+    # Initialize pygame and the environment
+    pygame.init()
+    env = TankEnv(obstacles="low")
+    env.reset()
+
+    # Run the game
+    main(env)
+
+    pygame.quit()
