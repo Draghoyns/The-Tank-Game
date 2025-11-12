@@ -10,8 +10,8 @@ from utils.coloring import (
     red,
 )
 
-import gym
-from gym import spaces
+import gymnasium as gym
+from gymnasium import spaces
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -27,7 +27,7 @@ class TankEnv(gym.Env):
         max_enemies_on_screen=5,
         total_ennemies_to_kill=20,
         obstacles="",
-        mode = "1p"
+        mode="1p",
     ):
         """obstacles: string of obstacles, in ['', 'low', 'high']"""
 
@@ -89,7 +89,9 @@ class TankEnv(gym.Env):
 
         # Define state
         self.state = {
-            "player": Tank(0, 0, np.array([0, 0, 1, 0]), label=0),  # Tank(0, 0, np.array([0, 0, 1, 0]))
+            "player": Tank(
+                0, 0, np.array([0, 0, 1, 0]), label=0
+            ),  # Tank(0, 0, np.array([0, 0, 1, 0]))
             "enemies": set(),  # (Tank(0, 0, np.array([0, 0, 1, 0])), Tank(0, 0, np.array([0, 0, 1, 0])), ...)
             "projectiles": set(),  # (Projectile(0, 0, np.array([0, 0, 1, 0]), label=0), Projectile(0, 0, np.array([0, 0, 1, 0]), label=1), ...)
             "obstacles": set(),
@@ -106,11 +108,18 @@ class TankEnv(gym.Env):
         self.reward_nothing = -0.01
         self.timestep = -0.001
 
-        self.done = False
+        self.done = False  # terminated ?
         self.info = {}
 
-    def reset(self, initial_run=True):
-        self.occupied_positions = set()
+    def reset(
+        self,
+        *,
+        initial_run: bool = True,
+        seed: int | None = None,
+        options: dict | None = None
+    ) -> tuple:
+        super().reset(seed=seed)
+        self.occupied_positions = set()  # "board"
         self.done = False
 
         if initial_run:
@@ -195,8 +204,9 @@ class TankEnv(gym.Env):
             self.reset()
         else:
             print("#### environnement reset successfully ####")
+        return (self.state, {})
 
-    def step(self, action):
+    def step(self, action: int):
         reward = self.timestep
 
         ## canceling projectiles that touch each other if necessary
@@ -283,7 +293,7 @@ class TankEnv(gym.Env):
                 reward += self.reward_player_dead
                 self.state["player"].deaths += 1
                 self.done
-                #self.reset(initial_run=False)
+                # self.reset(initial_run=False)
 
         # for 2p game, check if enemy is dead
         if self.mode == "2p":
@@ -298,10 +308,7 @@ class TankEnv(gym.Env):
                     self.state["projectiles"].remove(projectile)
                     self.state["enemy"].deaths += 1
                     self.done
-                    #self.reset(initial_run=False)
-
-
-
+                    # self.reset(initial_run=False)
 
         if self.state["player"].kills >= self.total_ennemies_to_kill:
             self.done = True
@@ -340,8 +347,9 @@ class TankEnv(gym.Env):
         ##################### update done #####################
 
         self.state["player"].score += reward
+        truncated = False  # to be re-considered
 
-        return self.state, reward, self.done, {}
+        return (self.state, reward, self.done, truncated, self.info)
 
     # __________RENDERING__________#
 
