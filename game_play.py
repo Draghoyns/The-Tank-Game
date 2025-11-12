@@ -35,8 +35,8 @@ def main(env):
             action = 5  # Shoot
 
         # Update the environment
-        state, reward, done, _ = env.step(action)
-        if done:
+        state, reward, done, trunc, _ = env.step(action)
+        if done or trunc:
             env.reset()
 
         # Render the game state

@@ -56,7 +56,7 @@ class TankEnv(gym.Env):
         )  # 0: up, 1: right, 2: down, 3: left, 4: stay, 5: shoot
 
         # Define observation space
-        dtypes = np.dtype("int32")
+        dtypes = np.int32
         self.observation_space = spaces.Dict(
             {
                 "player": spaces.Box(
