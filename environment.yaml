@@ -1,0 +1,10 @@
+name: tank
+channels:
+  - conda-forge
+dependencies:
+  - python=3.13
+  - pygame
+  - numpy
+  - matplotlib
+  - gymnasium
+prefix: /opt/homebrew/Caskroom/miniforge/base/envs/tank
