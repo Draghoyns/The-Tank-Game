@@ -48,7 +48,7 @@ def main(env):
         screen.blit(surface, (0, 0))
 
         # display score
-        value = round(state["player"].score, 0)
+        value = int(state["player"].score)
         score = f"Score: {value}"
         if value >= 0:
             score_surface = font.render(score, True, green)
