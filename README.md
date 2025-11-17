@@ -41,17 +41,37 @@ Run `game_play.py`.
 
 A window will pop up, with a green tank and yellow tanks. You are the green player.
 
-You can move with arrow keys (up - down - left - right) and shoot with the space bar.
+You can move with arrow keys (up - down - left - right) and shoot with `space`.
 
-If you die, the game resets. You cannot end the game unless you quit.
-
-TODO :
-- show the play time
-- stop if the player dies
-- make a fill function in game elements to be called when rendering 
-- refactor parts of the code that is redundant
+As of now, the game goes on infinitely :
+- you earn points if you kill enemies
+- you lose points if you get shot or if you don't move
 
 ## Limitations
 This study obviously has its limitations.
 The game space may be difficult to handle by algorithms, but the dynamics are very simple.
 Even more so that a single game ends at the first kill all entities considered.
+
+
+## TODO
+
+### Play mode
+You have 3 lives, which means if you get shot 3 times it's game over.
+
+- display lives
+- score = kills / cost projectile / cost inaction
+
+### Agent mode
+The script is playable (for now), but game mechanics rely only on score:
+- getting killed = -20
+- one kill = +10
+- shoot = -0.1
+- inaction = -0.01
+- per timestep = -0.001
+
+The game resets when the player killed 10 enemies.
+
+### Miscellaneous
+- show the play time
+- make a fill function in game elements to be called when rendering 
+- refactor parts of the code that is redundant
