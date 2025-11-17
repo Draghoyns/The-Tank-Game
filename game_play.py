@@ -23,20 +23,23 @@ def main(env):
         keys = pygame.key.get_pressed()
         action = 4  # Default action (stay)
 
-        if keys[pygame.K_LEFT]:
-            action = 0
-        elif keys[pygame.K_DOWN]:
-            action = 1
-        elif keys[pygame.K_RIGHT]:
-            action = 2
-        elif keys[pygame.K_UP]:
-            action = 3
-        elif keys[pygame.K_SPACE]:
-            action = 5  # Shoot
+        key_to_action = {
+            pygame.K_LEFT: 0,
+            pygame.K_DOWN: 1,
+            pygame.K_RIGHT: 2,
+            pygame.K_UP: 3,
+            pygame.K_SPACE: 5,  # Shoot
+        }
+
+        for key, act in key_to_action.items():
+            if keys[key]:
+                action = act
+                break
 
         # Update the environment
         state, reward, done, trunc, _ = env.step(action)
         if done or trunc:
+            # running = False
             env.reset()
 
         # Render the game state
@@ -68,7 +71,7 @@ def main(env):
 if __name__ == "__main__":
     # Initialize pygame and the environment
     pygame.init()
-    env = TankEnv(obstacles="low")
+    env = TankEnv(obstacles="")
     env.reset()
 
     # Run the game
