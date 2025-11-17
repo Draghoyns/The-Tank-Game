@@ -17,7 +17,20 @@ import numpy as np
 
 
 # Creating environnement
+
+
 class TankEnv(gym.Env):
+    """2D tank environment for single-player or two-player modes.
+
+    Args:
+        max_x (int): Width of the game screen.
+        max_y (int): Height of the game screen.
+        max_enemies_on_screen (int): Maximum simultaneous enemies.
+        total_enemies_to_kill (int): Number of kills required to finish the game.
+        obstacles (str): One of {"", "low", "high"} describing obstacle density ("" for no obstacle).
+        mode (str): "1p" for single-player or "2p" for PvP for algorithmic testing.
+    """
+
     metadata = {"render.modes": ["human"]}
 
     def __init__(
@@ -29,8 +42,6 @@ class TankEnv(gym.Env):
         obstacles="",
         mode="1p",
     ):
-        """obstacles: string of obstacles, in ['', 'low', 'high']"""
-
         super(TankEnv, self).__init__()
 
         self.max_x = max_x  # Width of grid
@@ -43,19 +54,17 @@ class TankEnv(gym.Env):
         self.obstacles = obstacles
         self.mode = mode
 
-        # assertions
+        # sanity checks
         assert max_x > 0
         assert max_y > 0
         assert max_enemies_on_screen > 0
         assert max_enemies_on_screen <= total_ennemies_to_kill
         assert (max_enemies_on_screen + 1) * 9 * 2 <= max_x * max_y
 
-        # Define action space
         self.action_space = spaces.Discrete(
             6
         )  # 0: up, 1: right, 2: down, 3: left, 4: stay, 5: shoot
 
-        # Define observation space
         dtypes = np.int32
         self.observation_space = spaces.Dict(
             {
@@ -87,13 +96,10 @@ class TankEnv(gym.Env):
         )
         self.action_space = spaces.Discrete(6)
 
-        # Define state
         self.state = {
-            "player": Tank(
-                0, 0, np.array([0, 0, 1, 0]), label=0
-            ),  # Tank(0, 0, np.array([0, 0, 1, 0]))
-            "enemies": set(),  # (Tank(0, 0, np.array([0, 0, 1, 0])), Tank(0, 0, np.array([0, 0, 1, 0])), ...)
-            "projectiles": set(),  # (Projectile(0, 0, np.array([0, 0, 1, 0]), label=0), Projectile(0, 0, np.array([0, 0, 1, 0]), label=1), ...)
+            "player": Tank(0, 0, np.array([0, 0, 1, 0]), label=0),
+            "enemies": set(),  # Tank objects
+            "projectiles": set(),  # Projectile objects, could be an array the size of the game screen ?
             "obstacles": set(),
         }
 
@@ -102,10 +108,16 @@ class TankEnv(gym.Env):
 
         self.probability_new_enemy = 0.01
 
+        # Rewards
+        ## kill-based reward
         self.reward_enemy_killed = 10
         self.reward_player_dead = -20
+
+        ## action-based reward
         self.reward_used_projectile = -0.1
         self.reward_nothing = -0.01
+
+        ## time-based reward
         self.timestep = -0.001
 
         self.done = False  # terminated ?
@@ -278,10 +290,7 @@ class TankEnv(gym.Env):
                     self.state["player"].kills += 1
                     break
 
-        # Check if the player is dead
-        # the game doesn't end when the player dies
-        # the game ends when the player dies lol
-        boxes = self.state["player"].bounding_box()
+        boxes = self.state[who].bounding_box()
         ennemies_projectiles_positions = []
         for projectile in list(self.state["projectiles"]):
             if projectile.label == 1:

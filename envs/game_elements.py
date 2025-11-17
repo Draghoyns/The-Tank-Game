@@ -15,18 +15,10 @@ class Tank:
         self.deaths = 0
 
     def bounding_box(self):
-        return [
-            (self.x + i, self.y + j)
-            for i in range(-1, 2)
-            for j in range(-1, 2)
-        ]
-    def big_bounding_box(self):
-        return [
-            (self.x + i, self.y + j)
-            for i in range(-2, 3)
-            for j in range(-2, 3)
-        ]
+        return [(self.x + i, self.y + j) for i in range(-1, 2) for j in range(-1, 2)]
 
+    def big_bounding_box(self):
+        return [(self.x + i, self.y + j) for i in range(-2, 3) for j in range(-2, 3)]
 
     def info(self):
         return (self.x, self.y, np.argmax(self.direction), self.label)
@@ -44,7 +36,12 @@ class Tank:
                 occupied_positions.remove((self.x, self.y))
                 x = self.x + self.direction[1] - self.direction[3]  # right - left
                 y = self.y + self.direction[2] - self.direction[0]  # down - up
-                if x < 0 or x >= boundaries["max_x"] or y < 0 or y >= boundaries["max_y"]:
+                if (
+                    x < 0
+                    or x >= boundaries["max_x"]
+                    or y < 0
+                    or y >= boundaries["max_y"]
+                ):
                     occupied_positions.add((self.x, self.y))
                     return occupied_positions
                 # check collision with other tanks
@@ -68,17 +65,36 @@ class Tank:
         return occupied_positions
 
     def update_strategic(self, state, occupied_positions, boundaries, strategy=0):
+        """
+        Three strategies available:
+        - 0 : completely random
+        - 1 : tends to follow its current facing direction
+        - 2 : tends to go towards the player
+
+        They are defined hierarchically, meaning default behavior of 2 is 1 and deault behavior of 1 is 0.
+
+        In other words:
+        for strategy 2, the tank goes towards the player with probability 0.7,
+        follow its current direction with probability 0.3 * 0.7 = 0.21,
+        and choose a random move with probability 0.09.
+
+        Probability for the mechanics can be customized.
+        """
         if strategy == 0:
             # random strategy
             action = np.random.randint(0, 6)  # TODO: change 5 to 6 after
-            occupied_positions = self.update(action, state, occupied_positions, boundaries)
+            occupied_positions = self.update(
+                action, state, occupied_positions, boundaries
+            )
 
         if strategy == 1:
             # follow more its direction with a probability of prob
             prob = 0.7
             if np.random.rand() < prob:
                 action = np.argmax(self.direction)
-                occupied_positions = self.update(action, state, occupied_positions, boundaries)
+                occupied_positions = self.update(
+                    action, state, occupied_positions, boundaries
+                )
             else:
                 return self.update_strategic(
                     state, occupied_positions, boundaries, strategy=0
@@ -99,12 +115,14 @@ class Tank:
                     action = 0
                 else:
                     action = 4
-                occupied_positions = self.update(action, state, occupied_positions, boundaries)
+                occupied_positions = self.update(
+                    action, state, occupied_positions, boundaries
+                )
             else:
                 return self.update_strategic(
                     state, occupied_positions, boundaries, strategy=1
                 )
-        
+
         return occupied_positions
 
     def shoot(self, state):
