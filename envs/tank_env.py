@@ -38,7 +38,7 @@ class TankEnv(gym.Env):
         max_x=20,
         max_y=20,
         max_enemies_on_screen=5,
-        total_ennemies_to_kill=20,
+        total_ennemies_to_kill=10,
         obstacles="",
         mode="1p",
     ):
@@ -218,9 +218,7 @@ class TankEnv(gym.Env):
             print("#### environnement reset successfully ####")
         return (self.state, {})
 
-    def step(self, action: int):
-        reward = self.timestep
-
+    def clean(self, action: int, reward: float) -> float:
         ## canceling projectiles that touch each other if necessary
         projectiles = list(self.state["projectiles"])
         for i in range(len(projectiles)):
@@ -236,30 +234,6 @@ class TankEnv(gym.Env):
                         self.state["projectiles"].remove(projectiles[j])
                     except:
                         pass
-
-        # Add 1 enemy if the number of active enemies is less than max_enemies
-        ## strategy: randomly with a probability of self.probability_new_enemy
-        if (
-            len(self.state["enemies"]) < self.max_enemies_on_screen
-            and np.random.rand() < self.probability_new_enemy
-        ) or len(self.state["enemies"]) == 0:
-            placed = False
-            while not placed:
-                x = np.random.randint(0, self.max_x)
-                y = np.random.randint(0, self.max_y)
-
-                direction = np.zeros(4, dtype=int)
-                direction[np.random.randint(0, 4)] = 1
-
-                enemy = Tank(x, y, direction, label=1)
-
-                boxes = enemy.big_bounding_box()
-                if any(box in self.occupied_positions for box in boxes):
-                    continue
-
-                self.state["enemies"].add(enemy)
-                self.occupied_positions.add((x, y))
-                placed = True
 
         # Clean up defeated enemies and used projectiles
         ## reward_enemy_killed for each defeated enemy
@@ -289,35 +263,64 @@ class TankEnv(gym.Env):
                     reward += self.reward_enemy_killed
                     self.state["player"].kills += 1
                     break
+        return reward
+
+    def check_death(self, reward, *, who: str) -> float:
+        mapping = {"player": 0, "enemy": 1}
 
         boxes = self.state[who].bounding_box()
         ennemies_projectiles_positions = []
         for projectile in list(self.state["projectiles"]):
-            if projectile.label == 1:
+            if projectile.label != mapping[who]:  # not their projectile
                 ennemies_projectiles_positions.append(projectile)
 
         for projectile in ennemies_projectiles_positions:
             if (projectile.x, projectile.y) in boxes:
                 self.state["projectiles"].remove(projectile)
-                reward += self.reward_player_dead
-                self.state["player"].deaths += 1
+                if who == "player":
+                    reward += self.reward_player_dead
+                self.state[who].deaths += 1
                 self.done
                 # self.reset(initial_run=False)
+        return reward
+
+    def step(self, action: int):
+        reward = self.timestep
+
+        reward = self.clean(action, reward)
+
+        # Add 1 enemy if the number of active enemies is less than max_enemies
+        ## strategy: randomly with a probability of self.probability_new_enemy
+        if (
+            len(self.state["enemies"]) < self.max_enemies_on_screen
+            and np.random.rand() < self.probability_new_enemy
+        ) or len(self.state["enemies"]) == 0:
+            placed = False
+            while not placed:
+                x = np.random.randint(0, self.max_x)
+                y = np.random.randint(0, self.max_y)
+
+                direction = np.zeros(4, dtype=int)
+                direction[np.random.randint(0, 4)] = 1
+
+                enemy = Tank(x, y, direction, label=1)
+
+                boxes = enemy.big_bounding_box()
+                if any(box in self.occupied_positions for box in boxes):
+                    continue
+
+                self.state["enemies"].add(enemy)
+                self.occupied_positions.add((x, y))
+                placed = True
+
+        # Check if the player is dead
+        # the game doesn't end when the player dies
+        # the game ends when the player dies lol
+        reward = self.check_death(reward, who="player")
 
         # for 2p game, check if enemy is dead
         if self.mode == "2p":
-            boxes = self.state["enemy"].bounding_box()
-            player_projectiles_positions = []
-            for projectile in list(self.state["projectiles"]):
-                if projectile.label == 0:
-                    player_projectiles_positions.append(projectile)
-
-            for projectile in player_projectiles_positions:
-                if (projectile.x, projectile.y) in boxes:
-                    self.state["projectiles"].remove(projectile)
-                    self.state["enemy"].deaths += 1
-                    self.done
-                    # self.reset(initial_run=False)
+            self.check_death(reward, who="enemy")
 
         if self.state["player"].kills >= self.total_ennemies_to_kill:
             self.done = True
