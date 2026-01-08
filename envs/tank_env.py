@@ -116,6 +116,9 @@ class TankEnv(gym.Env):
         ## time-based reward
         self.timestep = -0.001
 
+        # for accumulating reward
+        self.reward = 0
+
         self.done = False  # terminated ?
         self.info = {}
 
@@ -215,7 +218,11 @@ class TankEnv(gym.Env):
             print("#### environnement reset successfully ####")
         return (self.state, {})
 
-    def clean(self, action: int, reward: float) -> float:
+    def clean(self, action: int) -> None:
+        """Cleans the game board from killed enemies and used projectiles.
+        Args:
+            action (int): next action to perform
+        """
         ## canceling projectiles that touch each other if necessary
         projectiles = list(self.state["projectiles"])
         for i in range(len(projectiles)):
@@ -234,6 +241,7 @@ class TankEnv(gym.Env):
 
         # Clean up defeated enemies and used projectiles
         ## reward_enemy_killed for each defeated enemy
+        reward = 0
         obstacle_boxes = []
         for obstacle in list(self.state["obstacles"]):
             boxes = [
@@ -260,15 +268,21 @@ class TankEnv(gym.Env):
                     reward += self.reward_enemy_killed
                     self.state["player"].kills += 1
                     break
-        return reward
+        self.state["player"].score += reward
 
-    def check_death(self, reward, *, who: str) -> float:
-        mapping = {"player": 0, "enemy": 1}
+    def check_death(self, *, who: str) -> None:
+        """Checks if the called tank is dead. If yes, the game is marked as done.
+        If the player is dead, penalty is applied.
+
+        TODO : refactor to respect Single Responsibility Principle
+        """
+        reward = 0
+        label_map = {"player": 0, "enemy": 1}
 
         boxes = self.state[who].bounding_box()
         ennemies_projectiles_positions = []
         for projectile in list(self.state["projectiles"]):
-            if projectile.label != mapping[who]:  # not their projectile
+            if projectile.label != label_map[who]:  # not their projectile
                 ennemies_projectiles_positions.append(projectile)
 
         for projectile in ennemies_projectiles_positions:
@@ -277,14 +291,14 @@ class TankEnv(gym.Env):
                 if who == "player":
                     reward += self.reward_player_dead
                 self.state[who].deaths += 1
-                self.done
+                self.done = True
                 # self.reset(initial_run=False)
-        return reward
+        self.state["player"].score += reward
 
     def step(self, action: int) -> tuple[dict, float, bool, bool, dict]:
         reward = self.timestep
 
-        reward = self.clean(action, reward)
+        self.clean(action)
 
         # Add 1 enemy if the number of active enemies is less than max_enemies
         ## strategy: randomly with a probability of self.probability_new_enemy
@@ -312,12 +326,11 @@ class TankEnv(gym.Env):
 
         # Check if the player is dead
         # the game doesn't end when the player dies
-        # the game ends when the player dies lol
-        reward = self.check_death(reward, who="player")
+        self.check_death(who="player")
 
         # for 2p game, check if enemy is dead
         if self.mode == "2p":
-            self.check_death(reward, who="enemy")
+            self.check_death(who="enemy")
 
         # the game doesn't end when the player dies
         if self.state["player"].kills >= self.total_ennemies_to_kill:
