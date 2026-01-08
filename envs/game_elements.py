@@ -2,7 +2,7 @@ import numpy as np
 
 
 class Tank:
-    def __init__(self, x, y, direction, label=1):
+    def __init__(self, x: int, y: int, direction: np.ndarray, label: int = 1):
         # defined by the center (a tank = 3x3 in display)
         # Direction: 0 = up, 1 = right, 2 = down, 3 = left
         # label: 0 = player, 1 = enemy
@@ -24,7 +24,7 @@ class Tank:
         return (self.x, self.y, np.argmax(self.direction), self.label)
 
     def copy(self):
-        direction_copy = self.direction.copy()
+        direction_copy = np.copy(self.direction)
         return Tank(self.x, self.y, direction_copy, self.label)
 
     def update(self, action, state, occupied_positions, boundaries):

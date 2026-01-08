@@ -1,19 +1,15 @@
+import gymnasium as gym
+from gymnasium import spaces
+import matplotlib.pyplot as plt
+import numpy as np
+
 from envs.game_elements import *
 from utils.coloring import (
     fill_tank,
     fill_obstacle,
     fill_projectile,
-    green,
-    yellow,
-    black,
-    turquoise,
-    red,
+    Color,
 )
-
-import gymnasium as gym
-from gymnasium import spaces
-import matplotlib.pyplot as plt
-import numpy as np
 
 
 # Creating environnement
@@ -35,12 +31,12 @@ class TankEnv(gym.Env):
 
     def __init__(
         self,
-        max_x=20,
-        max_y=20,
-        max_enemies_on_screen=5,
-        total_ennemies_to_kill=10,
-        obstacles="",
-        mode="1p",
+        max_x: int = 20,
+        max_y: int = 20,
+        max_enemies_on_screen: int = 5,
+        total_ennemies_to_kill: int = 10,
+        obstacles: str = "",
+        mode: str = "1p",
     ):
         super(TankEnv, self).__init__()
 
@@ -135,6 +131,7 @@ class TankEnv(gym.Env):
         self.done = False
 
         if initial_run:
+
             # place the player
             ## strategy : random
             x = np.random.randint(0, self.max_x)
@@ -284,7 +281,7 @@ class TankEnv(gym.Env):
                 # self.reset(initial_run=False)
         return reward
 
-    def step(self, action: int):
+    def step(self, action: int) -> tuple[dict, float, bool, bool, dict]:
         reward = self.timestep
 
         reward = self.clean(action, reward)
@@ -322,6 +319,7 @@ class TankEnv(gym.Env):
         if self.mode == "2p":
             self.check_death(reward, who="enemy")
 
+        # the game doesn't end when the player dies
         if self.state["player"].kills >= self.total_ennemies_to_kill:
             self.done = True
 
@@ -365,35 +363,35 @@ class TankEnv(gym.Env):
 
     # __________RENDERING__________#
 
-    def render(self, mode="human"):
+    def render(self, mode="human") -> np.ndarray:
         # Create a matrix M of size max_x * max_y with a padding of 1 on each side
         rows = self.max_y + 2
         cols = self.max_x + 2
         M = np.ones((rows, cols, 3), dtype=np.uint8) * 240  # white background
 
         # fill the matrix with the elements of the environment
-
         ## fill with player
-        M = fill_tank(self.state["player"], green, M)
+        M = fill_tank(self.state["player"], Color.player, M)
 
         ## fill with enemies
         for enemy in self.state["enemies"]:
-            M = fill_tank(enemy, yellow, M)
+            M = fill_tank(enemy, Color.enemy, M)
 
         ## fill with obstacles
         # 3 x 3 square obstacle
         for obstacle in self.state["obstacles"]:
-            M = fill_obstacle(obstacle, black, M)
+            M = fill_obstacle(obstacle, Color.obstacle, M)
 
         ## fill with projectiles
         for projectile in self.state["projectiles"]:
-            M = fill_projectile(projectile, turquoise, red, M)
+            M = fill_projectile(projectile, M)
 
         # return frame
         return M
 
-    def plot_render(self):
-        M = self.render()
+    def plot_render(self) -> None:
+        """Generates the rendered frame and plots it."""
+        gameboard = self.render()
         plt.axis("off")
-        plt.imshow(M)
+        plt.imshow(gameboard)
         plt.show()

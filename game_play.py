@@ -1,11 +1,11 @@
 import pygame
 import numpy as np
 
-from envs import *
-from utils.coloring import green, red
+from envs import TankEnv
+from utils.coloring import Color
 
 
-def main(env):
+def main(env: TankEnv):
 
     # Set up the display
     screen_size = (env.max_x * 20, env.max_y * 20)  # Scale up the game screen
@@ -46,17 +46,16 @@ def main(env):
         frame = env.render()
         frame = np.repeat(
             np.repeat(frame, 18, axis=0), 18, axis=1
-        )  # Scale up the frame for visibility
+        )  # Scale up for visibility
         surface = pygame.surfarray.make_surface(frame)
         screen.blit(surface, (0, 0))
 
         # display score
         value = int(state["player"].score)
         score = f"Score: {value}"
-        if value >= 0:
-            score_surface = font.render(score, True, green)
-        else:
-            score_surface = font.render(score, True, red)
+        color = Color.positive_score if value >= 0 else Color.negative_score
+
+        score_surface = font.render(score, True, color.value)
         score_width = score_surface.get_width()  # Get the width of the rendered text
         screen.blit(
             score_surface, (screen.get_width() - score_width - 10, 10)
@@ -66,6 +65,11 @@ def main(env):
 
         # Cap the frame rate
         clock.tick(9)
+
+    # Game has stopped
+    # display the last frame
+    # display a 'game over'
+    # if agent mode, continue for n_ep times
 
 
 if __name__ == "__main__":
